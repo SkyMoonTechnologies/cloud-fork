@@ -3,7 +3,10 @@ FROM node:24-bookworm AS build
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --legacy-peer-deps --no-audit --no-fund
+# The upstream CloudStack package-lock.json is v1 and out of sync with
+# package.json (for example, axios). npm ci fails with EUSAGE; for this
+# disposable UI demo, let npm reconcile the lockfile inside the image.
+RUN npm install --legacy-peer-deps --no-audit --no-fund
 
 COPY . .
 
