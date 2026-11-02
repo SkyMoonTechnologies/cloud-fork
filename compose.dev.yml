@@ -1,0 +1,55 @@
+# Local development control plane for SkyMoon Cloud.
+# Do NOT expose this deployment to the public Internet.
+services:
+  skymoon-db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: cloud
+      MYSQL_USER: cloud
+      MYSQL_PASSWORD: ${SKYMOON_DEV_DB_PASSWORD:?Set SKYMOON_DEV_DB_PASSWORD in Komodo}
+      MYSQL_ROOT_PASSWORD: ${SKYMOON_DEV_DB_ROOT_PASSWORD:?Set SKYMOON_DEV_DB_ROOT_PASSWORD in Komodo}
+      MYSQL_ROOT_HOST: "%"
+    command:
+      - --max-connections=350
+      - --innodb-rollback-on-timeout=1
+      - --innodb-lock-wait-timeout=600
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+    volumes:
+      - skymoon-dev-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h127.0.0.1 -uroot --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  skymoon-management:
+    build:
+      context: .
+      dockerfile: management/dev/Dockerfile
+    restart: unless-stopped
+    environment:
+      SKYMOON_DEV_DB_PASSWORD: ${SKYMOON_DEV_DB_PASSWORD:?Set SKYMOON_DEV_DB_PASSWORD in Komodo}
+      SKYMOON_DEV_DB_ROOT_PASSWORD: ${SKYMOON_DEV_DB_ROOT_PASSWORD:?Set SKYMOON_DEV_DB_ROOT_PASSWORD in Komodo}
+    depends_on:
+      skymoon-db:
+        condition: service_healthy
+    # Only internal Docker networking. Do not publish management/API ports yet.
+
+  skymoon-ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile.demo
+      args:
+        SKYMOON_NGINX_CONFIG: nginx/dev.conf
+    restart: unless-stopped
+    ports:
+      - "5081:80"
+    depends_on:
+      - skymoon-management
+
+volumes:
+  skymoon-dev-mysql:
