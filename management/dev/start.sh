@@ -46,5 +46,14 @@ if [[ "${existing}" != "1" ]]; then
 fi
 
 unset MYSQL_PWD
+
+# The developer database initializer explicitly reads db.properties.override,
+# but the running management server looks up a file named db.properties.
+# Give Jetty a discoverable copy of the complete, container-specific config.
+mkdir -p /opt/skymoon/conf
+cp utils/conf/db.properties.override /opt/skymoon/conf/db.properties
+chmod 600 /opt/skymoon/conf/db.properties
+export CATALINA_HOME=/opt/skymoon
+
 echo "SkyMoon: launching development management API on port 8080"
 exec mvn -B -pl :cloud-client-ui jetty:run
