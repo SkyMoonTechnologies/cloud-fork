@@ -6,7 +6,12 @@ set -euo pipefail
 
 cd /opt/skymoon
 
-# The developer profile reads this ignored override file.
+# DatabaseCreator uses the override file AS THE ENTIRE DB configuration,
+# not as a merge with the base db.properties. Start from the full base file
+# to retain db.cloud.port/name, db.usage.port/name, JDBC settings and pool limits.
+# Later duplicate keys in Java properties are deliberately overridden below.
+cp utils/conf/db.properties utils/conf/db.properties.override
+
 # Restrict the prototype to alphanumeric DB passwords to avoid Java-properties escaping.
 for var in SKYMOON_DEV_DB_PASSWORD SKYMOON_DEV_DB_ROOT_PASSWORD; do
   value="${!var}"
@@ -17,7 +22,7 @@ for var in SKYMOON_DEV_DB_PASSWORD SKYMOON_DEV_DB_ROOT_PASSWORD; do
 done
 
 node_ip="$(hostname -i | awk '{print $1}')"
-cat > utils/conf/db.properties.override <<EOF
+cat >> utils/conf/db.properties.override <<EOF
 cluster.node.IP=${node_ip}
 db.cloud.host=skymoon-db
 db.cloud.username=cloud
