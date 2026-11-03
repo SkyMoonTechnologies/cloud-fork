@@ -19,9 +19,9 @@ COPY . .
 # Build only the management web application, development database tooling,
 # and their Maven dependencies. A full reactor build also runs unrelated
 # apidocs generation, which failed after all management components succeeded.
-# Persist Maven dependencies across Docker image rebuilds for faster retries.
-RUN --mount=type=cache,target=/root/.m2/repository \
-    mvn -B -Pdeveloper -DskipTests \
+# Keep Maven's local repository inside the image because developer mode runs
+# Maven again at container startup for database setup and Jetty.
+RUN mvn -B -Pdeveloper -DskipTests \
       -pl :cloud-client-ui,:cloud-developer -am \
       clean install
 
