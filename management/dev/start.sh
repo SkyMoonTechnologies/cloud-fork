@@ -47,9 +47,17 @@ fi
 
 unset MYSQL_PWD
 
-# The developer database initializer explicitly reads db.properties.override,
-# but the running management server looks up a file named db.properties.
-# Give Jetty a discoverable copy of the complete, container-specific config.
+# The database initializer reads utils/conf/db.properties.override, but Jetty
+# loads db.properties from client/target/conf via client/pom.xml extraClasspath.
+# Maven's generate-resources phase regenerates target/conf/db.properties from
+# client/conf/db.properties.in, which otherwise contains default localhost values.
+# Add a same-named non-template file to client/conf: the final Ant copy task
+# overwrites the generated defaults with these runtime connection settings.
+cp utils/conf/db.properties.override client/conf/db.properties
+cp utils/conf/db.properties.override client/target/conf/db.properties
+chmod 600 client/conf/db.properties client/target/conf/db.properties
+
+# Keep a fallback copy for tools that search catalina.home/conf as well.
 mkdir -p /opt/skymoon/conf
 cp utils/conf/db.properties.override /opt/skymoon/conf/db.properties
 chmod 600 /opt/skymoon/conf/db.properties
