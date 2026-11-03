@@ -31,6 +31,11 @@ services:
       context: .
       dockerfile: management/dev/Dockerfile
     restart: unless-stopped
+    # Run the Git-tracked startup script instead of the copy baked into the
+    # old Java image, so configuration fixes do not require a Maven rebuild.
+    command: ["/bin/bash", "/opt/skymoon/management/dev/start.sh"]
+    volumes:
+      - ./management/dev/start.sh:/opt/skymoon/management/dev/start.sh:ro
     environment:
       SKYMOON_DEV_DB_PASSWORD: ${SKYMOON_DEV_DB_PASSWORD:?Set SKYMOON_DEV_DB_PASSWORD in Komodo}
       SKYMOON_DEV_DB_ROOT_PASSWORD: ${SKYMOON_DEV_DB_ROOT_PASSWORD:?Set SKYMOON_DEV_DB_ROOT_PASSWORD in Komodo}
