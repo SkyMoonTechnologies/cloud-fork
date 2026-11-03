@@ -1,6 +1,6 @@
-# SkyMoon Cloud: developer-mode management backend from THIS repository.
-# Source build is deliberately used so future SkyMoon code changes are included.
-# This is a development image, not a production-hardened management image.
+# syntax=docker/dockerfile:1.7
+# SkyMoon Cloud: developer-mode management backend built from THIS repository.
+# Development only, not a production-hardened management server.
 FROM maven:3.9-eclipse-temurin-17
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -16,9 +16,14 @@ RUN apt-get update \
 WORKDIR /opt/skymoon
 COPY . .
 
-# Matches INSTALL.md's developer-mode Maven build, minus tests.
-# This full build may require substantial RAM, CPU, disk, and time.
-RUN mvn -B -Pdeveloper -DskipTests clean install
+# Build only the management web application, development database tooling,
+# and their Maven dependencies. A full reactor build also runs unrelated
+# apidocs generation, which failed after all management components succeeded.
+# Persist Maven dependencies across Docker image rebuilds for faster retries.
+RUN --mount=type=cache,target=/root/.m2/repository \
+    mvn -B -Pdeveloper -DskipTests \
+      -pl :cloud-client-ui,:cloud-developer -am \
+      clean install
 
 COPY management/dev/start.sh /usr/local/bin/skymoon-management-start
 RUN chmod 755 /usr/local/bin/skymoon-management-start
