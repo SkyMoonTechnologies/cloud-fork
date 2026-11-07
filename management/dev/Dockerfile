@@ -15,6 +15,8 @@ RUN apt-get update \
 
 WORKDIR /opt/skymoon
 COPY . .
+# The External provisioner executes the adapter directly, not via "python3".
+RUN chmod 755 /opt/skymoon/extensions/DigitalOcean/digitalocean.py
 
 # Build only the management web application, development database tooling,
 # and their Maven dependencies. A full reactor build also runs unrelated

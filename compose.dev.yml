@@ -36,9 +36,21 @@ services:
     command: ["/bin/bash", "/opt/skymoon/management/dev/start.sh"]
     volumes:
       - ./management/dev/start.sh:/opt/skymoon/management/dev/start.sh:ro
+      # Read-only provider extension code; persisted intent journal below.
+      - ./extensions/DigitalOcean:/opt/skymoon/extensions/DigitalOcean:ro
+      - skymoon-dev-provider-state:/var/lib/skymoon-providers
     environment:
       SKYMOON_DEV_DB_PASSWORD: ${SKYMOON_DEV_DB_PASSWORD:?Set SKYMOON_DEV_DB_PASSWORD in Komodo}
       SKYMOON_DEV_DB_ROOT_PASSWORD: ${SKYMOON_DEV_DB_ROOT_PASSWORD:?Set SKYMOON_DEV_DB_ROOT_PASSWORD in Komodo}
+      # These must be set in Komodo (or local untracked environment), never committed.
+      SKYMOON_DEV_DO_TOKEN: ${SKYMOON_DEV_DO_TOKEN:-}
+      SKYMOON_DO_REGION: ${SKYMOON_DO_REGION:-}
+      SKYMOON_DO_SIZE: ${SKYMOON_DO_SIZE:-}
+      SKYMOON_DO_IMAGE: ${SKYMOON_DO_IMAGE:-}
+      SKYMOON_DO_VPC_UUID: ${SKYMOON_DO_VPC_UUID:-}
+      SKYMOON_DO_STATE_DIR: /var/lib/skymoon-providers/digitalocean
+      SKYMOON_DO_ALLOW_CREATE: ${SKYMOON_DO_ALLOW_CREATE:-false}
+      SKYMOON_DO_ALLOWED_SIZES: ${SKYMOON_DO_ALLOWED_SIZES:-s-1vcpu-1gb}
     depends_on:
       skymoon-db:
         condition: service_healthy
@@ -58,3 +70,4 @@ services:
 
 volumes:
   skymoon-dev-mysql:
+  skymoon-dev-provider-state:
