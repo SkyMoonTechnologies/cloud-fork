@@ -42,3 +42,20 @@ commands documented in this repository's `INSTALL.md`.
   additional routing/network and agent configuration.
 - Source builds and database initialization have **not** been verified in the
   user's Komodo environment. Capture logs if the first build/start fails.
+
+
+## Database bootstrap safety (SKY-003)
+
+On startup, `management/dev/db-init-guard.sh` counts the development database tables and
+checks `cloud.configuration`, `cloud.user`, and `cloud.data_center`.
+It only permits `mvn ... -Ddeploydb` when the `cloud` schema has **zero tables**.
+A populated but incomplete schema aborts startup instead of being overwritten.
+
+Test the guard without MySQL or a running management server:
+
+```bash
+bash management/dev/tests/test-db-init-guard.sh
+```
+
+The guard checks table inventory, not logical consistency or application schema version.
+Back up the named volume before upgrades; this is not a substitute for migrations or recovery testing.
