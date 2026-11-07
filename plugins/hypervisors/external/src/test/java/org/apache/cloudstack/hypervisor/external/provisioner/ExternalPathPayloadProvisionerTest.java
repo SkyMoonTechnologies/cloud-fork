@@ -49,6 +49,7 @@ import java.util.Properties;
 import javax.naming.ConfigurationException;
 
 import org.apache.cloudstack.api.ApiConstants;
+import org.apache.cloudstack.api.ResourceDetail;
 import org.apache.cloudstack.extension.Extension;
 import org.apache.cloudstack.framework.extensions.manager.ExtensionsManager;
 import org.apache.logging.log4j.Logger;
@@ -97,7 +98,6 @@ import com.cloud.vm.VirtualMachineProfile;
 import com.cloud.vm.VmDetailConstants;
 import com.cloud.vm.dao.UserVmDao;
 import com.cloud.vm.dao.VMInstanceDetailsDao;
-import org.apache.cloudstack.api.ResourceDetail;
 
 @RunWith(MockitoJUnitRunner.class)
 public class ExternalPathPayloadProvisionerTest {
@@ -212,6 +212,19 @@ public class ExternalPathPayloadProvisionerTest {
         when(detail.getValue()).thenReturn("different-provider-id");
         when(vmInstanceDetailsDao.findDetail(42L, "skymoon.provider.id")).thenReturn(detail);
 
+        provisioner.persistProviderIdFromExternalCreateResponse(vm, "{\"provider_id\":123456}");
+    }
+
+    @Test(expected = CloudRuntimeException.class)
+    public void testRejectObjectProviderId() {
+        VirtualMachineTO vm = mock(VirtualMachineTO.class);
+        provisioner.persistProviderIdFromExternalCreateResponse(vm, "{\"provider_id\":{\"id\":1}}");
+    }
+
+    @Test(expected = CloudRuntimeException.class)
+    public void testRejectProviderIdWithoutInternalVmDatabaseIdentity() {
+        VirtualMachineTO vm = mock(VirtualMachineTO.class);
+        when(vm.getId()).thenReturn(0L);
         provisioner.persistProviderIdFromExternalCreateResponse(vm, "{\"provider_id\":123456}");
     }
 
