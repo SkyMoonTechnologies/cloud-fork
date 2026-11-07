@@ -33,13 +33,13 @@
           v-model:value="form.name"
           v-focus="true" />
       </a-form-item>
-      <a-form-item name="netmask" ref="netmask">
+      <a-form-item v-if="!isProviderManagedZone" name="netmask" ref="netmask">
         <template #label>
           <tooltip-label :title="$t('label.netmask')" :tooltip="$t('label.netmask.description')"/>
         </template>
         <a-input v-model:value="form.netmask" />
       </a-form-item>
-      <a-form-item name="gateway" ref="gateway">
+      <a-form-item v-if="!isProviderManagedZone" name="gateway" ref="gateway">
         <template #label>
           <tooltip-label :title="$t('label.gateway')" :tooltip="$t('label.gateway.description')"/>
         </template>
@@ -97,7 +97,8 @@ export default {
     return {
       loading: false,
       storageAccessGroups: [],
-      storageAccessGroupsLoading: false
+      storageAccessGroupsLoading: false,
+      zonesList: []
     }
   },
   beforeCreate () {
@@ -107,8 +108,22 @@ export default {
   created () {
     this.initForm()
     this.fetchStorageAccessGroupsData()
+    this.fetchZones()
+  },
+  computed: {
+    isProviderManagedZone () {
+      const zone = this.zonesList.find(item => item.id === this.resource.zoneid)
+      return Boolean(zone?.providermanaged)
+    }
   },
   methods: {
+    fetchZones () {
+      getAPI('listZones', { showicon: false }).then(response => {
+        this.zonesList = response.listzonesresponse.zone || []
+      }).catch(error => {
+        this.$notifyError(error)
+      })
+    },
     initForm () {
       this.formRef = ref()
       this.form = reactive({
@@ -142,8 +157,10 @@ export default {
         console.log(values)
         const params = {}
         params.id = this.resource.id
-        params.netmask = values.netmask
-        params.gateway = values.gateway
+        if (!this.isProviderManagedZone) {
+          params.netmask = values.netmask
+          params.gateway = values.gateway
+        }
         params.name = values.name
         this.loading = true
 
