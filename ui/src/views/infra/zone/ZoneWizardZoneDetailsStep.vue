@@ -130,6 +130,14 @@
           </a-select-option>
         </a-select>
       </a-form-item>
+      <a-form-item
+        v-if="isAdvancedZone && !isEdgeZone && !securityGroupsEnabled && form.hypervisor === 'External'"
+        name="providerManaged"
+        label="Provider-managed infrastructure"
+        v-bind="formItemLayout">
+        <a-switch v-model:checked="form.providerManaged" />
+        <div>Use the external provider's networking and storage. The zone will be created disabled until the remaining resources are configured.</div>
+      </a-form-item>
       <div v-if="!this.isEdgeZone">
         <a-form-item
           name="networkOfferingId"
@@ -168,7 +176,7 @@
           ref="guestcidraddress"
           :label="$t('label.default.network.guestcidraddress.isolated.network')"
           v-bind="formItemLayout"
-          v-if="isAdvancedZone && !securityGroupsEnabled"
+          v-if="isAdvancedZone && !securityGroupsEnabled && !form.providerManaged"
           has-feedback>
           <a-input v-model:value="form.guestcidraddress" />
         </a-form-item>
@@ -230,6 +238,7 @@
           </a-select>
         </a-form-item>
         <a-form-item
+          v-if="!form.providerManaged"
           name="localstorageenabled"
           ref="localstorageenabled"
           :label="$t('label.local.storage.enabled')"
@@ -237,6 +246,7 @@
           <a-switch v-model:checked="form.localstorageenabled"/>
         </a-form-item>
         <a-form-item
+          v-if="!form.providerManaged"
           name="localstorageenabledforsystemvm"
           ref="localstorageenabledforsystemvm"
           :label="$t('label.local.storage.enabled.system.vms')"
@@ -317,6 +327,7 @@ export default {
     this.form.account = this.account
     this.form.localstorageenabled = this.localstorageenabled
     this.form.localstorageenabledforsystemvm = this.localstorageenabledforsystemvm
+    this.form.providerManaged = this.prefillContent?.providerManaged || false
 
     this.formModel = toRaw(this.form)
   },
@@ -325,6 +336,16 @@ export default {
       deep: true,
       handler (changedFields) {
         const fieldsChanged = toRaw(changedFields)
+        // Changing away from the supported External/Advanced configuration clears the opt-in.
+        if (fieldsChanged.providerManaged &&
+            (fieldsChanged.hypervisor !== 'External' || !this.isAdvancedZone || this.securityGroupsEnabled || this.isEdgeZone)) {
+          this.form.providerManaged = false
+        }
+        if (this.form.providerManaged) {
+          this.form.guestcidraddress = null
+          this.form.localstorageenabled = false
+          this.form.localstorageenabledforsystemvm = false
+        }
         if (fieldsChanged.networkOfferingId && this.prefillContent.networkOfferingSelected) {
           if (this.prefillContent.networkOfferingSelected.id !== fieldsChanged.networkOfferingId) {
             fieldsChanged.physicalNetworks = []

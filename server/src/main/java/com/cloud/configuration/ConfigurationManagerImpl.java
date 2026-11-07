@@ -177,6 +177,7 @@ import com.cloud.dc.DataCenterGuestIpv6PrefixVO;
 import com.cloud.dc.DataCenterIpAddressVO;
 import com.cloud.dc.DataCenterLinkLocalIpAddressVO;
 import com.cloud.dc.DataCenterVO;
+import com.cloud.dc.DataCenterDetailVO;
 import com.cloud.dc.DedicatedResourceVO;
 import com.cloud.dc.DomainVlanMapVO;
 import com.cloud.dc.HostPodVO;
@@ -573,6 +574,8 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
 
     private static final String DefaultForSystemVmsForPodIpRange = "0";
     private static final String DefaultVlanForPodIpRange = Vlan.UNTAGGED;
+    // SkyMoon-only opt-in mode. Do not infer this from External hypervisor alone.
+    public static final String SKYMOON_PROVIDER_MANAGED_ZONE_DETAIL = "skymoon.provider.managed";
 
     private static final Set<Provider> VPC_ONLY_PROVIDERS = Sets.newHashSet(Provider.VPCVirtualRouter, Provider.JuniperContrailVpcRouter, Provider.InternalLbVm);
 
@@ -1833,6 +1836,11 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
         }
     }
 
+    private boolean isProviderManagedZone(final long zoneId) {
+        final DataCenterDetailVO detail = _dcDetailsDao.findDetail(zoneId, SKYMOON_PROVIDER_MANAGED_ZONE_DETAIL);
+        return detail != null && Boolean.parseBoolean(detail.getValue());
+    }
+
     private void checkPodAttributesForNonEdgeZone(final long podId, final String podName, final DataCenter zone, final String gateway,
           final String cidr, final String startIp, final String endIp, final boolean skipGatewayOverlapCheck) {
 
@@ -1887,7 +1895,7 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
             }
         }
 
-        if (!DataCenter.Type.Edge.equals(zone.getType())) {
+        if (!DataCenter.Type.Edge.equals(zone.getType()) && !isProviderManagedZone(zone.getId())) {
             checkPodAttributesForNonEdgeZone(podId, podName, zone, gateway, cidr, startIp, endIp, skipGatewayOverlapCheck);
         }
 
@@ -2509,6 +2517,26 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
             throw new InvalidParameterValueException("Unable to find pod by id " + id);
         }
 
+        if (isProviderManagedZone(pod.getDataCenterId())) {
+            if (ObjectUtils.anyNotNull(startIp, endIp, gateway, netmask)) {
+                throw new InvalidParameterValueException(
+                        "Management IP ranges cannot be configured on a provider-managed pod");
+            }
+            final DataCenterVO zone = _zoneDao.findById(pod.getDataCenterId());
+            final String newName = name == null ? pod.getName() : name;
+            final String newAllocationState = allocationStateStr == null
+                    ? pod.getAllocationState().toString() : allocationStateStr;
+            if (StringUtils.isBlank(newName)) {
+                throw new InvalidParameterValueException("A pod name is required");
+            }
+            checkPodAttributes(id, newName, zone, null, null, null, null, newAllocationState,
+                    !pod.getName().equals(newName), true);
+            pod.setName(newName);
+            pod.setAllocationState(Grouping.AllocationState.valueOf(newAllocationState));
+            _podDao.update(id, pod);
+            return pod;
+        }
+
         // If the gateway, CIDR, private IP range is being changed, check if the
         // pod has allocated private IP addresses
         if (podHasAllocatedPrivateIPs(id)) {
@@ -2639,13 +2667,12 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
         }
 
         String cidr = null;
-        if (!DataCenter.Type.Edge.equals(zone.getType())) {
+        if (!DataCenter.Type.Edge.equals(zone.getType()) && !isProviderManagedZone(zone.getId())) {
             checkPodRangeParametersBasicsForNonEdgeZone(startIp, endIp, gateway, netmask);
             cidr = NetUtils.ipAndNetMaskToCidr(gateway, netmask);
-        } else {
-            if (ObjectUtils.anyNotNull(startIp, endIp, gateway, netmask)) {
-                throw new InvalidParameterValueException("IP range parameters can not be specified for a pod in an edge zone");
-            }
+        } else if (ObjectUtils.anyNotNull(startIp, endIp, gateway, netmask)) {
+            throw new InvalidParameterValueException(
+                    "IP ranges cannot be specified for an Edge or provider-managed pod");
         }
 
         final Long userId = CallContext.current().getCallingUserId();
@@ -2660,9 +2687,11 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
     @DB
     public HostPodVO createPod(final long userId, final String podName, final DataCenter zone, final String gateway, final String cidr, String startIp, String endIp, final String allocationStateStr,
                                final boolean skipGatewayOverlapCheck, List<String> storageAccessGroups) {
-        final String cidrAddress = DataCenter.Type.Edge.equals(zone.getType()) ? "" : getCidrAddress(cidr);
-        final int cidrSize = DataCenter.Type.Edge.equals(zone.getType()) ? 0 : getCidrSize(cidr);
-        if (DataCenter.Type.Edge.equals(zone.getType())) {
+        final boolean providerManagedPod = isProviderManagedZone(zone.getId());
+        final boolean hasNoPhysicalIpRanges = DataCenter.Type.Edge.equals(zone.getType()) || providerManagedPod;
+        final String cidrAddress = hasNoPhysicalIpRanges ? "" : getCidrAddress(cidr);
+        final int cidrSize = hasNoPhysicalIpRanges ? 0 : getCidrSize(cidr);
+        if (hasNoPhysicalIpRanges) {
             startIp = null;
             endIp = null;
         }
@@ -2705,9 +2734,11 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
                 _zoneDao.addPrivateIpAddress(zone.getId(), pod.getId(), startIpFinal, endIpFinal, false, null);
             }
 
-            final String[] linkLocalIpRanges = NetUtils.getLinkLocalIPRange(_configDao.getValue(Config.ControlCidr.key()));
-            if (linkLocalIpRanges.length > 1) {
-                _zoneDao.addLinkLocalIpAddress(zone.getId(), pod.getId(), linkLocalIpRanges[0], linkLocalIpRanges[1]);
+            if (!providerManagedPod) {
+                final String[] linkLocalIpRanges = NetUtils.getLinkLocalIPRange(_configDao.getValue(Config.ControlCidr.key()));
+                if (linkLocalIpRanges.length > 1) {
+                    _zoneDao.addLinkLocalIpAddress(zone.getId(), pod.getId(), linkLocalIpRanges[0], linkLocalIpRanges[1]);
+                }
             }
 
             CallContext.current().putContextParameter(Pod.class, pod.getUuid());
@@ -3166,6 +3197,14 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
     public DataCenterVO createZone(final long userId, final String zoneName, final String dns1, final String dns2, final String internalDns1, final String internalDns2, final String guestCidr, final String domain,
                                    final Long domainId, final NetworkType zoneType, final String allocationStateStr, final String networkDomain, final boolean isSecurityGroupEnabled, final boolean isLocalStorageEnabled,
                                    final String ip6Dns1, final String ip6Dns2, final boolean isEdge, List<String> storageAccessGroups) {
+        return createZoneInternal(userId, zoneName, dns1, dns2, internalDns1, internalDns2, guestCidr, domain,
+                domainId, zoneType, allocationStateStr, networkDomain, isSecurityGroupEnabled, isLocalStorageEnabled,
+                ip6Dns1, ip6Dns2, isEdge, storageAccessGroups, false);
+    }
+
+    private DataCenterVO createZoneInternal(final long userId, final String zoneName, final String dns1, final String dns2, final String internalDns1, final String internalDns2, final String guestCidr, final String domain,
+                                   final Long domainId, final NetworkType zoneType, final String allocationStateStr, final String networkDomain, final boolean isSecurityGroupEnabled, final boolean isLocalStorageEnabled,
+                                   final String ip6Dns1, final String ip6Dns2, final boolean isEdge, List<String> storageAccessGroups, final boolean providerManaged) {
 
         // checking the following params outside checkzoneparams method as we do
         // not use these params for updatezone
@@ -3180,6 +3219,21 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
                 throw new InvalidParameterValueException(
                         "Invalid network domain. Total length shouldn't exceed 190 chars. Each domain label must be between 1 and 63 characters long, can contain ASCII letters 'a' through 'z', the digits '0' through '9', "
                                 + "and the hyphen ('-'); can't start or end with \"-\"");
+            }
+        }
+
+        if (providerManaged) {
+            if (zoneType != NetworkType.Advanced || isEdge || isSecurityGroupEnabled || isLocalStorageEnabled) {
+                throw new InvalidParameterValueException(
+                        "Provider-managed zones must be Advanced Core zones without local storage or security groups");
+            }
+            if (guestCidr != null) {
+                throw new InvalidParameterValueException(
+                        "Provider-managed networking cannot use a CloudStack guest CIDR");
+            }
+            if (Grouping.AllocationState.Enabled.toString().equalsIgnoreCase(allocationStateStr)) {
+                throw new InvalidParameterValueException(
+                        "Provider-managed zones must be configured before being enabled");
             }
         }
 
@@ -3217,12 +3271,15 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
                     _dedicatedDao.persist(dedicatedResource);
                 }
 
-                // Create default system networks
-                createDefaultSystemNetworks(zone.getId());
+                if (providerManaged) {
+                    _dcDetailsDao.addDetail(zone.getId(), SKYMOON_PROVIDER_MANAGED_ZONE_DETAIL, "true", true);
+                } else {
+                    // Provider-managed zones have provider-owned networking, not CloudStack system networks.
+                    createDefaultSystemNetworks(zone.getId());
+                }
 
-                // Associate cross zone templates with the Edge Zones here because they don't have SSVMs
-                // For Core zones, this happens when the SSVM starts up.
-                if (isEdge) {
+                // Neither Edge nor provider-managed zones run a secondary storage VM.
+                if (isEdge || providerManaged) {
                     _templateService.associateCrossZoneTemplatesToZone(zone.getId());
                 }
 
@@ -3353,8 +3410,8 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
             isSecurityGroupEnabled = true;
         }
 
-        return createZone(userId, zoneName, dns1, dns2, internalDns1, internalDns2, guestCidr, domainVO != null ? domainVO.getName() : null, domainId, zoneType, allocationState,
-                networkDomain, isSecurityGroupEnabled, isLocalStorageEnabled, ip6Dns1, ip6Dns2, isEdge, storageAccessGroups);
+        return createZoneInternal(userId, zoneName, dns1, dns2, internalDns1, internalDns2, guestCidr, domainVO != null ? domainVO.getName() : null, domainId, zoneType, allocationState,
+                networkDomain, isSecurityGroupEnabled, isLocalStorageEnabled, ip6Dns1, ip6Dns2, isEdge, storageAccessGroups, cmd.isProviderManaged());
     }
 
     @Override

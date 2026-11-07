@@ -30,6 +30,7 @@
       <a-form-item name="zoneid" ref="zoneid" class="form__item" :label="$t('label.zone')">
         <a-select
           v-model:value="form.zoneid"
+          @change="updateIpValidation"
           v-focus="true"
           showSearch
           optionFilterProp="label"
@@ -57,28 +58,28 @@
         />
       </a-form-item>
 
-      <a-form-item name="gateway" ref="gateway" class="form__item" :label="$t('label.reservedsystemgateway')">
+      <a-form-item v-if="!isProviderManagedZone" name="gateway" ref="gateway" class="form__item" :label="$t('label.reservedsystemgateway')">
         <a-input
           :placeholder="placeholder.gateway"
           v-model:value="form.gateway"
         />
       </a-form-item>
 
-      <a-form-item name="netmask" ref="netmask" class="form__item" :label="$t('label.reservedsystemnetmask')">
+      <a-form-item v-if="!isProviderManagedZone" name="netmask" ref="netmask" class="form__item" :label="$t('label.reservedsystemnetmask')">
         <a-input
           :placeholder="placeholder.netmask"
           v-model:value="form.netmask"
         />
       </a-form-item>
 
-      <a-form-item name="startip" ref="startip" class="form__item" :label="$t('label.reservedsystemstartip')">
+      <a-form-item v-if="!isProviderManagedZone" name="startip" ref="startip" class="form__item" :label="$t('label.reservedsystemstartip')">
         <a-input
           :placeholder="placeholder.startip"
           v-model:value="form.startip"
         />
       </a-form-item>
 
-      <a-form-item name="endip" ref="endip" class="form__item" :label="$t('label.reservedsystemendip')">
+      <a-form-item v-if="!isProviderManagedZone" name="endip" ref="endip" class="form__item" :label="$t('label.reservedsystemendip')">
         <a-input
           :placeholder="placeholder.endip"
           v-model:value="form.endip"
@@ -149,7 +150,26 @@ export default {
     this.initForm()
     this.fetchData()
   },
+  computed: {
+    isProviderManagedZone () {
+      const zone = this.zonesList.find(item => item.id === this.form.zoneid)
+      return Boolean(zone?.providermanaged)
+    }
+  },
   methods: {
+    updateIpValidation () {
+      // Hidden physical-IP fields are not required for provider-managed logical pods.
+      const required = !this.isProviderManagedZone
+      for (const field of ['gateway', 'netmask', 'startip']) {
+        this.rules[field][0].required = required
+      }
+      if (!required) {
+        this.form.gateway = undefined
+        this.form.netmask = undefined
+        this.form.startip = undefined
+        this.form.endip = undefined
+      }
+    },
     initForm () {
       this.formRef = ref()
       this.form = reactive({})
@@ -168,7 +188,8 @@ export default {
       this.loading = true
       getAPI('listZones', { showicon: true }).then(response => {
         this.zonesList = response.listzonesresponse.zone || []
-        this.form.zoneid = this.zonesList[0].id
+        this.form.zoneid = this.zonesList[0]?.id || null
+        this.updateIpValidation()
         this.params = this.$store.getters.apis.createPod.params
         Object.keys(this.placeholder).forEach(item => { this.returnPlaceholder(item) })
       }).catch(error => {
@@ -189,14 +210,16 @@ export default {
         const values = toRaw(this.form)
 
         this.loading = true
-        postAPI('createPod', {
-          zoneId: values.zoneid,
-          name: values.name,
-          gateway: values.gateway,
-          netmask: values.netmask,
-          startip: values.startip,
-          endip: values.endip
-        }).then(response => {
+        const params = { zoneId: values.zoneid, name: values.name }
+        if (!this.isProviderManagedZone) {
+          Object.assign(params, {
+            gateway: values.gateway,
+            netmask: values.netmask,
+            startip: values.startip,
+            endip: values.endip
+          })
+        }
+        postAPI('createPod', params).then(response => {
           const pod = response.createpodresponse.pod || {}
           if (pod.id && this.showDedicated) {
             this.dedicatePod(pod.id)

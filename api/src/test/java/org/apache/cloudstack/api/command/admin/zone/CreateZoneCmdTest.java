@@ -23,6 +23,17 @@ import org.springframework.test.util.ReflectionTestUtils;
 public class CreateZoneCmdTest {
 
     @Test
+    public void isProviderManagedDefaultsToFalseAndMustBeExplicitlyEnabled() {
+        CreateZoneCmd cmd = new CreateZoneCmd();
+        ReflectionTestUtils.setField(cmd, "providerManaged", null);
+        Assert.assertFalse(cmd.isProviderManaged());
+        ReflectionTestUtils.setField(cmd, "providerManaged", false);
+        Assert.assertFalse(cmd.isProviderManaged());
+        ReflectionTestUtils.setField(cmd, "providerManaged", true);
+        Assert.assertTrue(cmd.isProviderManaged());
+    }
+
+    @Test
     public void isEdge() {
         CreateZoneCmd createZoneCmd = new CreateZoneCmd();
         ReflectionTestUtils.setField(createZoneCmd, "isEdge", null);

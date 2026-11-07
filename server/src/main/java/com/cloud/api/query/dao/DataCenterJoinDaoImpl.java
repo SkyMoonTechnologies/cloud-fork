@@ -18,6 +18,7 @@ package com.cloud.api.query.dao;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -169,7 +170,12 @@ public class DataCenterJoinDaoImpl extends GenericDaoBase<DataCenterJoinVO, Long
 
         zoneResponse.setRoutedModeEnabled(RoutedIpv4Manager.RoutedNetworkVpcEnabled.valueIn(dataCenter.getId()));
 
-        zoneResponse.setResourceDetails(ApiDBUtils.getResourceDetails(dataCenter.getId(), ResourceObjectType.Zone));
+        final Map<String, String> zoneDetails =
+                ApiDBUtils.getResourceDetails(dataCenter.getId(), ResourceObjectType.Zone);
+        zoneResponse.setResourceDetails(zoneDetails);
+        // Opt-in zone mode is visible as a first-class API field; old zones default to false.
+        zoneResponse.setProviderManaged(zoneDetails != null &&
+                Boolean.parseBoolean(zoneDetails.get("skymoon.provider.managed")));
         zoneResponse.setHasAnnotation(annotationDao.hasAnnotations(dataCenter.getUuid(), AnnotationService.EntityType.ZONE.name(),
                 _accountMgr.isRootAdmin(CallContext.current().getCallingAccount().getId())));
         zoneResponse.setAllowUserSpecifyVRMtu(NetworkService.AllowUsersToSpecifyVRMtu.valueIn(dataCenter.getId()));
