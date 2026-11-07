@@ -42,3 +42,14 @@ commands documented in this repository's `INSTALL.md`.
   additional routing/network and agent configuration.
 - Source builds and database initialization have **not** been verified in the
   user's Komodo environment. Capture logs if the first build/start fails.
+
+
+## DigitalOcean extension pilot
+
+The tracked experimental adapter is in [extensions/DigitalOcean](../../extensions/DigitalOcean/README.md).
+The Compose service forwards optional provider settings from the Komodo environment,
+bind-mounts the adapter read-only, and uses a named persistent volume
+`skymoon-dev-provider-state` for irreversible create-attempt markers.
+Do not run `docker compose down -v`, since this would delete both the database
+**and the provider intent journal**. A normal deployment has no billable
+effect until an operator registers/configures the extension and invokes it.
