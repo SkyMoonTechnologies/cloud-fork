@@ -49,6 +49,8 @@ services:
       SKYMOON_DO_IMAGE: ${SKYMOON_DO_IMAGE:-}
       SKYMOON_DO_VPC_UUID: ${SKYMOON_DO_VPC_UUID:-}
       SKYMOON_DO_STATE_DIR: /var/lib/skymoon-providers/digitalocean
+      SKYMOON_DO_ALLOW_CREATE: ${SKYMOON_DO_ALLOW_CREATE:-false}
+      SKYMOON_DO_ALLOWED_SIZES: ${SKYMOON_DO_ALLOWED_SIZES:-s-1vcpu-1gb}
     depends_on:
       skymoon-db:
         condition: service_healthy
