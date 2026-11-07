@@ -49,6 +49,7 @@ import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
 import org.apache.cloudstack.api.ApiConstants;
+import org.apache.cloudstack.api.ResourceDetail;
 import org.apache.cloudstack.extension.Extension;
 import org.apache.cloudstack.framework.extensions.manager.ExtensionsManager;
 import org.apache.cloudstack.utils.security.DigestHelper;
@@ -94,7 +95,6 @@ import com.cloud.vm.VirtualMachineProfile;
 import com.cloud.vm.VirtualMachineProfileImpl;
 import com.cloud.vm.VmDetailConstants;
 import com.cloud.vm.dao.VMInstanceDetailsDao;
-import org.apache.cloudstack.api.ResourceDetail;
 import com.cloud.vm.dao.UserVmDao;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -415,6 +415,9 @@ public class ExternalPathPayloadProvisioner extends ManagerBase implements Exter
         }
         if (!result.has("provider_id") || result.get("provider_id").isJsonNull()) {
             return;
+        }
+        if (!result.get("provider_id").isJsonPrimitive()) {
+            throw new CloudRuntimeException("Invalid non-scalar provider_id returned by external create");
         }
         final String providerId = result.get("provider_id").getAsString();
         if (providerId == null || !providerId.matches("[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")) {
