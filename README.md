@@ -17,6 +17,16 @@
  under the License.
  -->
 
+# SkyMoon Cloud
+
+This is the SkyMoon Cloud development fork of Apache CloudStack. It is being extended to support SkyMoon-managed products and provider-backed infrastructure. The original CloudStack documentation remains below for the inherited platform.
+
+**New contributors:** Start with the [SkyMoon contributor handbook](docs/skymoon/README.md), [architecture map](docs/skymoon/architecture.md), [development and testing](docs/skymoon/testing.md), and [contribution standards](docs/skymoon/contributing.md). Track planned provider-managed VM work in [SKY-EPIC-001](https://github.com/SkyMoonTechnologies/cloud/issues/2).
+
+> SkyMoon's experimental development stack is not a production public-cloud deployment. Do not expose its services publicly or use customer/provider credentials in tests.
+
+---
+
 # Apache CloudStack
 
 [![Build Status](https://github.com/apache/cloudstack/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/apache/cloudstack/actions/workflows/build.yml)
