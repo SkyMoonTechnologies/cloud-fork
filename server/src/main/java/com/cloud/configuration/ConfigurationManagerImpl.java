@@ -2517,6 +2517,26 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
             throw new InvalidParameterValueException("Unable to find pod by id " + id);
         }
 
+        if (isProviderManagedZone(pod.getDataCenterId())) {
+            if (ObjectUtils.anyNotNull(startIp, endIp, gateway, netmask)) {
+                throw new InvalidParameterValueException(
+                        "Management IP ranges cannot be configured on a provider-managed pod");
+            }
+            final DataCenterVO zone = _zoneDao.findById(pod.getDataCenterId());
+            final String newName = name == null ? pod.getName() : name;
+            final String newAllocationState = allocationStateStr == null
+                    ? pod.getAllocationState().toString() : allocationStateStr;
+            if (StringUtils.isBlank(newName)) {
+                throw new InvalidParameterValueException("A pod name is required");
+            }
+            checkPodAttributes(id, newName, zone, null, null, null, null, newAllocationState,
+                    !pod.getName().equals(newName), true);
+            pod.setName(newName);
+            pod.setAllocationState(Grouping.AllocationState.valueOf(newAllocationState));
+            _podDao.update(id, pod);
+            return pod;
+        }
+
         // If the gateway, CIDR, private IP range is being changed, check if the
         // pod has allocated private IP addresses
         if (podHasAllocatedPrivateIPs(id)) {
