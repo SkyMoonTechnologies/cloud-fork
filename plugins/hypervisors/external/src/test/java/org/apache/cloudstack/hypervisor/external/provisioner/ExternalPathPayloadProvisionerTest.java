@@ -49,6 +49,7 @@ import java.util.Properties;
 import javax.naming.ConfigurationException;
 
 import org.apache.cloudstack.api.ApiConstants;
+import org.apache.cloudstack.api.ResourceDetail;
 import org.apache.cloudstack.extension.Extension;
 import org.apache.cloudstack.framework.extensions.manager.ExtensionsManager;
 import org.apache.logging.log4j.Logger;
@@ -87,6 +88,7 @@ import com.cloud.hypervisor.HypervisorGuru;
 import com.cloud.hypervisor.HypervisorGuruManager;
 import com.cloud.template.VirtualMachineTemplate;
 import com.cloud.utils.FileUtil;
+import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.Pair;
 import com.cloud.utils.PropertiesUtil;
 import com.cloud.utils.script.Script;
@@ -95,6 +97,7 @@ import com.cloud.vm.VirtualMachine;
 import com.cloud.vm.VirtualMachineProfile;
 import com.cloud.vm.VmDetailConstants;
 import com.cloud.vm.dao.UserVmDao;
+import com.cloud.vm.dao.VMInstanceDetailsDao;
 
 @RunWith(MockitoJUnitRunner.class)
 public class ExternalPathPayloadProvisionerTest {
@@ -105,6 +108,9 @@ public class ExternalPathPayloadProvisionerTest {
 
     @Mock
     private UserVmDao userVmDao;
+
+    @Mock
+    private VMInstanceDetailsDao vmInstanceDetailsDao;
 
     @Mock
     private HostDao hostDao;
@@ -173,6 +179,60 @@ public class ExternalPathPayloadProvisionerTest {
         testScript.setExecutable(true);
         testScript.setReadable(true);
         testScript.setWritable(true);
+    }
+
+    @Test
+    public void testPersistProviderIdAfterExternalCreate() {
+        VirtualMachineTO vm = mock(VirtualMachineTO.class);
+        when(vm.getId()).thenReturn(42L);
+
+        provisioner.persistProviderIdFromExternalCreateResponse(
+                vm, "{\"status\":\"success\",\"provider_id\":123456}");
+        Mockito.verify(vmInstanceDetailsDao).addDetail(42L, "skymoon.provider.id", "123456", false);
+    }
+
+    @Test
+    public void testExistingProviderIdIsIdempotent() {
+        VirtualMachineTO vm = mock(VirtualMachineTO.class);
+        when(vm.getId()).thenReturn(42L);
+        ResourceDetail detail = mock(ResourceDetail.class);
+        when(detail.getValue()).thenReturn("123456");
+        when(vmInstanceDetailsDao.findDetail(42L, "skymoon.provider.id")).thenReturn(detail);
+
+        provisioner.persistProviderIdFromExternalCreateResponse(vm, "{\"provider_id\":\"123456\"}");
+        Mockito.verify(vmInstanceDetailsDao, Mockito.never()).addDetail(
+                Mockito.anyLong(), Mockito.anyString(), Mockito.anyString(), Mockito.anyBoolean());
+    }
+
+    @Test(expected = CloudRuntimeException.class)
+    public void testProviderIdConflictRequiresReconciliation() {
+        VirtualMachineTO vm = mock(VirtualMachineTO.class);
+        when(vm.getId()).thenReturn(42L);
+        ResourceDetail detail = mock(ResourceDetail.class);
+        when(detail.getValue()).thenReturn("different-provider-id");
+        when(vmInstanceDetailsDao.findDetail(42L, "skymoon.provider.id")).thenReturn(detail);
+
+        provisioner.persistProviderIdFromExternalCreateResponse(vm, "{\"provider_id\":123456}");
+    }
+
+    @Test(expected = CloudRuntimeException.class)
+    public void testRejectObjectProviderId() {
+        VirtualMachineTO vm = mock(VirtualMachineTO.class);
+        provisioner.persistProviderIdFromExternalCreateResponse(vm, "{\"provider_id\":{\"id\":1}}");
+    }
+
+    @Test(expected = CloudRuntimeException.class)
+    public void testRejectProviderIdWithoutInternalVmDatabaseIdentity() {
+        VirtualMachineTO vm = mock(VirtualMachineTO.class);
+        when(vm.getId()).thenReturn(0L);
+        provisioner.persistProviderIdFromExternalCreateResponse(vm, "{\"provider_id\":123456}");
+    }
+
+    @Test
+    public void testLegacyProviderResponseDoesNotWriteProviderId() {
+        VirtualMachineTO vm = mock(VirtualMachineTO.class);
+        provisioner.persistProviderIdFromExternalCreateResponse(vm, "{\"status\":\"success\"}");
+        Mockito.verifyNoInteractions(vmInstanceDetailsDao);
     }
 
     @Test

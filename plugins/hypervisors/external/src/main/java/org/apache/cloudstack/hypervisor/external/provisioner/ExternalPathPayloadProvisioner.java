@@ -49,6 +49,7 @@ import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
 import org.apache.cloudstack.api.ApiConstants;
+import org.apache.cloudstack.api.ResourceDetail;
 import org.apache.cloudstack.extension.Extension;
 import org.apache.cloudstack.framework.extensions.manager.ExtensionsManager;
 import org.apache.cloudstack.utils.security.DigestHelper;
@@ -93,6 +94,7 @@ import com.cloud.vm.VirtualMachine;
 import com.cloud.vm.VirtualMachineProfile;
 import com.cloud.vm.VirtualMachineProfileImpl;
 import com.cloud.vm.VmDetailConstants;
+import com.cloud.vm.dao.VMInstanceDetailsDao;
 import com.cloud.vm.dao.UserVmDao;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -113,6 +115,11 @@ public class ExternalPathPayloadProvisioner extends ManagerBase implements Exter
 
     @Inject
     UserVmDao _uservmDao;
+
+    @Inject
+    VMInstanceDetailsDao vmInstanceDetailsDao;
+
+    private static final String SKYMOON_PROVIDER_ID_DETAIL = "skymoon.provider.id";
 
     @Inject
     HostDao hostDao;
@@ -374,6 +381,11 @@ public class ExternalPathPayloadProvisioner extends ManagerBase implements Exter
                 logger.debug(errMsg);
                 return new StartAnswer(cmd, result.second());
             }
+            if (isDeploy) {
+                // The provider may return a native resource ID after accepting an async VM create.
+                // Persist it immediately and do not silently switch a VM to a different provider ID.
+                persistProviderIdFromExternalCreateResponse(virtualMachineTO, result.second());
+            }
             logger.debug(String.format("%s VM %s on the external system", operation, vmUUID));
             return new StartAnswer(cmd);
 
@@ -382,6 +394,47 @@ public class ExternalPathPayloadProvisioner extends ManagerBase implements Exter
             logger.debug(errMsg);
             return new StartAnswer(cmd, errMsg);
         }
+    }
+
+    /**
+     * Persist a provider resource ID returned by a VM create extension, without changing
+     * existing extension behavior when no provider_id field is returned.
+     * The physical VM can exist even if this write fails, so the caller reports an
+     * error and the provider must be reconciled before attempting another create.
+     */
+    protected void persistProviderIdFromExternalCreateResponse(VirtualMachineTO vm, String output) {
+        if (StringUtils.isBlank(output)) {
+            return;
+        }
+        final JsonObject result;
+        try {
+            result = JsonParser.parseString(output).getAsJsonObject();
+        } catch (RuntimeException e) {
+            // Legacy extension implementations may return non-JSON success output.
+            return;
+        }
+        if (!result.has("provider_id") || result.get("provider_id").isJsonNull()) {
+            return;
+        }
+        if (!result.get("provider_id").isJsonPrimitive()) {
+            throw new CloudRuntimeException("Invalid non-scalar provider_id returned by external create");
+        }
+        final String providerId = result.get("provider_id").getAsString();
+        if (providerId == null || !providerId.matches("[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")) {
+            throw new CloudRuntimeException("Invalid provider_id returned by external create");
+        }
+        if (vm == null || vm.getId() <= 0) {
+            throw new CloudRuntimeException("Cannot persist external provider ID without a VM database ID");
+        }
+        final ResourceDetail existing = vmInstanceDetailsDao.findDetail(vm.getId(), SKYMOON_PROVIDER_ID_DETAIL);
+        if (existing != null) {
+            if (!providerId.equals(existing.getValue())) {
+                throw new CloudRuntimeException(
+                        "Conflicting external provider ID for VM " + vm.getUuid() + "; reconciliation required");
+            }
+            return;
+        }
+        vmInstanceDetailsDao.addDetail(vm.getId(), SKYMOON_PROVIDER_ID_DETAIL, providerId, false);
     }
 
     private Pair<Boolean, String> executeStartCommandOnExternalSystem(String extensionName, boolean isDeploy,
