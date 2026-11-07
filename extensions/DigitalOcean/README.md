@@ -19,6 +19,8 @@ For the development pilot only, set these environment variables **on the managem
 | `SKYMOON_DO_SIZE` | Target provider SKU, e.g. `s-1vcpu-1gb` |
 | `SKYMOON_DO_IMAGE` | Provider image, e.g. `ubuntu-24-04-x64` |
 | `SKYMOON_DO_VPC_UUID` | Existing DigitalOcean VPC UUID |
+| `SKYMOON_DO_ALLOW_CREATE` | Must explicitly equal `true` before a new billable Droplet POST; otherwise new VM creation is blocked |
+| `SKYMOON_DO_ALLOWED_SIZES` | Comma-separated allowed SKU slugs; defaults to only `s-1vcpu-1gb` |
 | `SKYMOON_DO_STATE_DIR` | Persistent intent directory, defaults to `/var/lib/skymoon-providers/digitalocean` |
 
 Extension/host-scoped `externaldetails` may specify `region`, `size`, `image`, `vpc_uuid` and `ssh_keys`; these override the corresponding environment values. **Do not expose these fields to customers before the backend access model and capability checks are implemented.** The management Compose stack binds the code read-only and mounts a named volume for the intent journal. The adapter must be executable: `chmod +x extensions/DigitalOcean/digitalocean.py` if installed from a plain ZIP/copy, or use its executable Git mode.
@@ -43,7 +45,7 @@ python3 -m unittest discover -s extensions/DigitalOcean/tests -v
 python3 -m py_compile extensions/DigitalOcean/digitalocean.py
 ```
 
-The 14 tests cover create preflight fields, duplicate detection, uncertain create and delete outcomes, state checkpoints, status mapping, tenant tag refusal, and power operations. No test calls DigitalOcean.
+The 16 tests cover create preflight fields, duplicate detection, uncertain create and delete outcomes, state checkpoints, status mapping, tenant tag refusal, and power operations. No test calls DigitalOcean.
 
 ## Deployment
 
