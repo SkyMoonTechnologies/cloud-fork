@@ -187,6 +187,11 @@ export default {
   computed: {
     zoneSteps () {
       var steps = [...this.steps]
+      // Provider-owned zones are created as disabled metadata first. Do not
+      // send users through conventional VLAN/public-IP/storage steps.
+      if (this.zoneConfig.providerManaged) {
+        steps = steps.filter(step => step.name !== 'network' && step.name !== 'resources')
+      }
       if (this.zoneConfig.zoneSuperType !== 'Edge') {
         steps.splice(1, 0, this.coreZoneTypeStep)
       }
