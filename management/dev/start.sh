@@ -37,12 +37,14 @@ chmod 600 utils/conf/db.properties.override
 export MYSQL_PWD="${SKYMOON_DEV_DB_ROOT_PASSWORD}"
 mysql -hskymoon-db -uroot -e 'SELECT 1' >/dev/null
 
-# Initialize only once. The developer deploydb goal can modify database data.
-existing="$(mysql -hskymoon-db -uroot -N -e \
-  "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='cloud' AND table_name='configuration'")"
-if [[ "${existing}" != "1" ]]; then
-  echo "SkyMoon: initializing development management database..."
+# Only initialize a truly empty schema; fail safely if initialization was interrupted.
+# Do not run developer deploydb on a populated or partially initialized volume.
+schema_action="$(bash management/dev/db-init-guard.sh)"
+if [[ "$schema_action" == "initialize" ]]; then
+  echo "SkyMoon: initializing empty development management database..."
   mvn -B -Pdeveloper -pl developer -Ddeploydb
+else
+  echo "SkyMoon: found existing management schema; leaving data intact."
 fi
 
 unset MYSQL_PWD
