@@ -150,6 +150,27 @@ def record_intent(path, vmid):
         raise ProviderError("Prior VM creation attempt is unresolved; reconcile the provider before retrying") from None
 
 
+def read_intent(path):
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        # Any corrupt/incomplete state is uncertain, never an empty checkpoint.
+        return {"status": "uncertain"}
+
+
+def update_intent(path, vmid, status, provider_id=None):
+    data = {"vmid": vmid, "status": status}
+    if provider_id is not None:
+        data["provider_id"] = provider_id
+    with path.open("w", encoding="utf-8") as fp:
+        os.chmod(path, 0o600)
+        json.dump(data, fp)
+        fp.flush()
+        os.fsync(fp.fileno())
+
+
 def dispatch(action, payload, api):
     if action == "prepare":
         vmid = vm_identity(payload)
@@ -184,10 +205,12 @@ def dispatch(action, payload, api):
             if existing_size and existing_size != size:
                 raise ProviderError("Existing VM has the wrong DigitalOcean size")
             return {"status": "success", "message": "Existing VM found", "provider_id": existing["id"]}
+        # Validate all request fields before writing the irreversible intent marker.
+        droplet_name = safe_name(payload, vmid)
         # Durable local intent prevents blindly repeating POST after an unknown outcome.
         marker = state_file(vmid)
         record_intent(marker, vmid)
-        args = {"name": safe_name(payload, vmid), "region": region,
+        args = {"name": droplet_name, "region": region,
                 "size": size, "image": image, "vpc_uuid": vpc,
                 "tags": [MANAGED_TAG, vm_tag(vmid)]}
         ssh_keys = config(payload, "ssh_keys")
@@ -197,15 +220,22 @@ def dispatch(action, payload, api):
         droplet = body.get("droplet")
         if not isinstance(droplet, dict) or not droplet.get("id"):
             raise ProviderError("Droplet creation response missing provider ID; reconcile before retry")
+        update_intent(marker, vmid, "submitted", droplet["id"])
         return {"status": "success", "provider_id": droplet["id"]}
 
     droplet = find_vm(api, vmid)
     if action == "status":
         return {"status": "success", "power_state": power(droplet) if droplet else "PowerUnknown"}
     if action == "delete":
+        marker = state_file(vmid)
         if droplet:
             api.request("DELETE", f"/droplets/{int(droplet['id'])}")
-        # Do not clear a creation marker for a missing VM: a delayed POST may still succeed.
+            update_intent(marker, vmid, "delete_requested", droplet["id"])
+        else:
+            intent = read_intent(marker)
+            # Absent immediately after a create may be eventual consistency.
+            if intent and intent.get("status") not in ("delete_requested", "deleted"):
+                raise ProviderError("Prior VM creation is unresolved; cannot confirm safe deletion")
         return {"status": "success", "message": "Delete requested or VM already absent"}
     if action == "stop" and not droplet:
         return {"status": "success", "message": "VM absent"}
