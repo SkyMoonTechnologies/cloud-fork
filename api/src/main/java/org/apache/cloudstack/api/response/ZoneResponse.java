@@ -162,6 +162,10 @@ public class ZoneResponse extends BaseResponseWithAnnotations implements SetReso
     @Param(description = "External network provider if any", since = "4.21.0")
     private String provider = null;
 
+    @SerializedName(ApiConstants.PROVIDER_MANAGED)
+    @Param(description = "True for a SkyMoon provider-managed Core zone")
+    private boolean providerManaged;
+
     @SerializedName(ApiConstants.MULTI_ARCH)
     @Param(description = "True, if zone contains clusters and hosts from different CPU architectures", since = "4.20")
     private boolean multiArch;
@@ -449,6 +453,10 @@ public class ZoneResponse extends BaseResponseWithAnnotations implements SetReso
 
     public String getStorageAccessGroups() {
         return storageAccessGroups;
+    }
+
+    public void setProviderManaged(boolean providerManaged) {
+        this.providerManaged = providerManaged;
     }
 
     public void setStorageAccessGroups(String storageAccessGroups) {
