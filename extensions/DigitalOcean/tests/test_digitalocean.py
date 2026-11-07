@@ -82,6 +82,20 @@ class AdapterTests(unittest.TestCase):
             do.dispatch("create", payload(), api)
         self.assertEqual(sum(1 for method, _, _ in api.calls if method == "POST"), 1)
 
+    def test_delete_refuses_ambiguous_create(self):
+        api = FakeAPI(fail_create=True)
+        with self.assertRaises(do.ProviderError):
+            do.dispatch("create", payload(), api)
+        with self.assertRaisesRegex(do.ProviderError, "cannot confirm safe deletion"):
+            do.dispatch("delete", payload(), api)
+
+    def test_delete_after_accepted_create_records_tombstone(self):
+        api = FakeAPI()
+        do.dispatch("create", payload(), api)
+        api.existing = droplet()
+        self.assertEqual(do.dispatch("delete", payload(), api)["status"], "success")
+        self.assertEqual(do.dispatch("delete", payload(), FakeAPI())["status"], "success")
+
     def test_status_maps_cloudstack_power_states(self):
         self.assertEqual(do.dispatch("status", payload(), FakeAPI(existing=droplet("active")))["power_state"], "PowerOn")
         self.assertEqual(do.dispatch("status", payload(), FakeAPI(existing=droplet("off")))["power_state"], "PowerOff")
