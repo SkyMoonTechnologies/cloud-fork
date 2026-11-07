@@ -1,0 +1,32 @@
+name: SkyMoon External Provider Offline Tests
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'extensions/MockProvider/**'
+      - 'extensions/DigitalOcean/**'
+      - '.github/workflows/skymoon-external-provider-tests.yml'
+  pull_request:
+    paths:
+      - 'extensions/MockProvider/**'
+      - 'extensions/DigitalOcean/**'
+      - '.github/workflows/skymoon-external-provider-tests.yml'
+permissions:
+  contents: read
+jobs:
+  provider-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python version
+        run: python3 --version
+      - name: MockProvider tests
+        run: |
+          python3 -m py_compile extensions/MockProvider/mock_provider.py
+          python3 -m unittest discover -s extensions/MockProvider/tests -v
+      - name: DigitalOcean tests, if present
+        run: |
+          if [ -f extensions/DigitalOcean/digitalocean.py ]; then
+            python3 -m py_compile extensions/DigitalOcean/digitalocean.py
+            python3 -m unittest discover -s extensions/DigitalOcean/tests -v
+          fi
