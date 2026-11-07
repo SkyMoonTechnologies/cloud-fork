@@ -37,9 +37,9 @@ Read the [provider-managed VM epic](https://github.com/SkyMoonTechnologies/cloud
    ```bash
    git clone https://github.com/SkyMoonTechnologies/cloud.git
    cd cloud
-   git switch -c docs-or-feature/<ticket-short-name>
+   git switch -c feature/SKY-001-external-vm-trace
    ```
-3. Read [management/dev/README.md](../../management/dev/README.md) before starting the backend. Use a private LAN/Tailscale environment, never a public deployment.
+3. Read [management/dev/README.md](../../management/dev/README.md) before starting the backend. Replace the sample issue branch name with your ticket ID and short slug. Use a private LAN/Tailscale environment, never a public deployment.
 4. Supply distinct, strong `SKYMOON_DEV_DB_PASSWORD` and `SKYMOON_DEV_DB_ROOT_PASSWORD` through Komodo or a **local untracked** environment file. Both are currently required to be alphanumeric by `management/dev/start.sh`. Do not paste them into tickets or commits.
 5. Inspect the Compose config *before* any build or `up`. Run the non-destructive commands from [testing.md](testing.md).
 6. Work on **one issue/branch**, document observed behavior and link your pull request to that issue. Prefer a spike/research ticket if runtime assumptions have not been verified.
