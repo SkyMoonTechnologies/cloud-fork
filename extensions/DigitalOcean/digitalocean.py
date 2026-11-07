@@ -205,6 +205,12 @@ def dispatch(action, payload, api):
             if existing_size and existing_size != size:
                 raise ProviderError("Existing VM has the wrong DigitalOcean size")
             return {"status": "success", "message": "Existing VM found", "provider_id": existing["id"]}
+        # A new Droplet is billable. Require an explicit operator opt-in for POST.
+        if os.environ.get("SKYMOON_DO_ALLOW_CREATE") != "true":
+            raise ProviderError("DigitalOcean VM creation is disabled; set SKYMOON_DO_ALLOW_CREATE=true explicitly")
+        allowed = [x.strip() for x in os.environ.get("SKYMOON_DO_ALLOWED_SIZES", "s-1vcpu-1gb").split(",") if x.strip()]
+        if size not in allowed:
+            raise ProviderError("DigitalOcean VM size is not permitted by operator policy")
         # Validate all request fields before writing the irreversible intent marker.
         droplet_name = safe_name(payload, vmid)
         # Durable local intent prevents blindly repeating POST after an unknown outcome.
