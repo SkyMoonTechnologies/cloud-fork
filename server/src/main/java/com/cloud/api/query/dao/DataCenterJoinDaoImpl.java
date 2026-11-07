@@ -170,6 +170,10 @@ public class DataCenterJoinDaoImpl extends GenericDaoBase<DataCenterJoinVO, Long
         zoneResponse.setRoutedModeEnabled(RoutedIpv4Manager.RoutedNetworkVpcEnabled.valueIn(dataCenter.getId()));
 
         zoneResponse.setResourceDetails(ApiDBUtils.getResourceDetails(dataCenter.getId(), ResourceObjectType.Zone));
+        // Opt-in zone mode is visible as a first-class API field; old zones default to false.
+        zoneResponse.setProviderManaged(Boolean.parseBoolean(
+                ApiDBUtils.getResourceDetails(dataCenter.getId(), ResourceObjectType.Zone)
+                        .getOrDefault("skymoon.provider.managed", "false")));
         zoneResponse.setHasAnnotation(annotationDao.hasAnnotations(dataCenter.getUuid(), AnnotationService.EntityType.ZONE.name(),
                 _accountMgr.isRootAdmin(CallContext.current().getCallingAccount().getId())));
         zoneResponse.setAllowUserSpecifyVRMtu(NetworkService.AllowUsersToSpecifyVRMtu.valueIn(dataCenter.getId()));
