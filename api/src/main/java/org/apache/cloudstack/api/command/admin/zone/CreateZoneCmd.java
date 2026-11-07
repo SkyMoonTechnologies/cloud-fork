@@ -90,6 +90,10 @@ public class CreateZoneCmd extends BaseCmd {
     @Parameter(name = ApiConstants.IS_EDGE, type = CommandType.BOOLEAN, description = "True if the zone is an edge zone, false otherwise", since = "4.18.0")
     private Boolean isEdge;
 
+    @Parameter(name = ApiConstants.PROVIDER_MANAGED, type = CommandType.BOOLEAN,
+            description = "Opt-in SkyMoon provider-managed Core zone; uses provider-owned networking and storage instead of CloudStack-managed system networks")
+    private Boolean providerManaged;
+
     @Parameter(name = ApiConstants.STORAGE_ACCESS_GROUPS,
             type = CommandType.LIST, collectionType = CommandType.STRING,
             description = "comma separated list of storage access groups for the hosts in the zone",
@@ -167,6 +171,10 @@ public class CreateZoneCmd extends BaseCmd {
             return false;
         }
         return isEdge;
+    }
+
+    public boolean isProviderManaged() {
+        return Boolean.TRUE.equals(providerManaged);
     }
 
     public List<String> getStorageAccessGroups() {
