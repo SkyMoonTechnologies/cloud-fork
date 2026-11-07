@@ -66,8 +66,20 @@
       </a-steps>
     </a-card>
     <div class="form-action">
+      <a-alert
+        v-if="processStatus==='finish' && prefillContent.providerManaged"
+        type="warning"
+        message="Provider-managed zone created, but remains disabled. Add its logical pod, External cluster/host, network extension and templates before enabling."
+        show-icon />
       <a-button
-        v-if="processStatus==='finish'"
+        v-if="processStatus==='finish' && prefillContent.providerManaged"
+        class="button-next"
+        type="primary"
+        @click="closeProviderManagedZone">
+        Close
+      </a-button>
+      <a-button
+        v-if="processStatus==='finish' && !prefillContent.providerManaged"
         class="button-next"
         type="primary"
         :loading="loading"
@@ -182,12 +194,13 @@ export default {
       return this.prefillContent?.networkOfferingSelected?.selectedBaremetalProviders || []
     },
     physicalNetworks () {
-      const tungstenNetworks = this.prefillContent.physicalNetworks.filter(network => network.isolationMethod === 'TF')
+      const configuredNetworks = this.prefillContent.physicalNetworks || []
+      const tungstenNetworks = configuredNetworks.filter(network => network.isolationMethod === 'TF')
       if (tungstenNetworks && tungstenNetworks.length > 0) {
         return tungstenNetworks
       }
 
-      return this.prefillContent.physicalNetworks
+      return configuredNetworks
     }
   },
   mounted () {
@@ -206,6 +219,10 @@ export default {
     }
   },
   methods: {
+    closeProviderManagedZone () {
+      this.$emit('closeAction')
+      this.$emit('refresh-data')
+    },
     addStep (title, step) {
       this.steps.push({
         index: this.currentStep,
@@ -332,7 +349,7 @@ export default {
       } else {
         if (!this.sgEnabled) {
           params.securitygroupenabled = false
-          if (guestcidraddress != null && guestcidraddress.length > 0) {
+          if (!this.prefillContent.providerManaged && guestcidraddress != null && guestcidraddress.length > 0) {
             params.guestcidraddress = guestcidraddress
           }
         } else {
@@ -340,7 +357,8 @@ export default {
         }
       }
       params.name = this.prefillContent?.name
-      params.localstorageenabled = this.prefillContent?.localstorageenabled || false
+      params.localstorageenabled = this.prefillContent.providerManaged ? false : (this.prefillContent?.localstorageenabled || false)
+      params.providermanaged = Boolean(this.prefillContent.providerManaged)
       params.dns1 = this.prefillContent.ipv4Dns1
       params.dns2 = this.prefillContent?.ipv4Dns2 || null
       params.ip6dns1 = this.prefillContent?.ipv6Dns1 || null
@@ -356,6 +374,14 @@ export default {
           this.stepData.stepMove.push('createZone')
         }
         await this.stepDedicateZone()
+        if (this.processStatus === STATUS_FAILED) {
+          return
+        }
+        if (this.prefillContent.providerManaged) {
+          // Do not allocate fake CloudStack physical networks, hosts, IP pools, or storage.
+          this.stepComplete()
+          return
+        }
         await this.stepAddPhysicalNetworks()
       } catch (e) {
         this.messageError = e
