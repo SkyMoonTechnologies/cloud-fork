@@ -43,7 +43,7 @@ python3 -m unittest discover -s extensions/DigitalOcean/tests -v
 python3 -m py_compile extensions/DigitalOcean/digitalocean.py
 ```
 
-The tests cover create preflight fields, duplicate detection, uncertain create outcomes, status mapping, tenant tag refusal, and power operations. No test calls DigitalOcean.
+The 14 tests cover create preflight fields, duplicate detection, uncertain create and delete outcomes, state checkpoints, status mapping, tenant tag refusal, and power operations. No test calls DigitalOcean.
 
 ## Deployment
 
