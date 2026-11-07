@@ -36,6 +36,8 @@ services:
     command: ["/bin/bash", "/opt/skymoon/management/dev/start.sh"]
     volumes:
       - ./management/dev/start.sh:/opt/skymoon/management/dev/start.sh:ro
+      # Keep the DB safety guard in sync with the bind-mounted startup script.
+      - ./management/dev/db-init-guard.sh:/opt/skymoon/management/dev/db-init-guard.sh:ro
     environment:
       SKYMOON_DEV_DB_PASSWORD: ${SKYMOON_DEV_DB_PASSWORD:?Set SKYMOON_DEV_DB_PASSWORD in Komodo}
       SKYMOON_DEV_DB_ROOT_PASSWORD: ${SKYMOON_DEV_DB_ROOT_PASSWORD:?Set SKYMOON_DEV_DB_ROOT_PASSWORD in Komodo}
