@@ -51,13 +51,29 @@ class AdapterTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.patch = patch.dict(os.environ, {"SKYMOON_DO_STATE_DIR": self.tmp.name})
+        self.patch = patch.dict(os.environ, {"SKYMOON_DO_STATE_DIR": self.tmp.name,
+                                           "SKYMOON_DO_ALLOW_CREATE": "true"})
         self.patch.start()
         self.addCleanup(self.patch.stop)
 
     def test_prepare_patch(self):
         self.assertEqual(do.dispatch("prepare", payload(), FakeAPI()),
                          {"details": {"skymoon_do_tag": do.vm_tag(VMID)}})
+
+    def test_create_requires_explicit_operator_opt_in(self):
+        api = FakeAPI()
+        with patch.dict(os.environ, {"SKYMOON_DO_ALLOW_CREATE": "false"}):
+            with self.assertRaisesRegex(do.ProviderError, "creation is disabled"):
+                do.dispatch("create", payload(), api)
+        self.assertFalse(any(x[0] == "POST" for x in api.calls))
+
+    def test_create_rejects_unapproved_size(self):
+        api = FakeAPI()
+        data = payload()
+        data["externaldetails"]["extension"]["size"] = "s-8vcpu-16gb"
+        with self.assertRaisesRegex(do.ProviderError, "not permitted"):
+            do.dispatch("create", data, api)
+        self.assertFalse(any(x[0] == "POST" for x in api.calls))
 
     def test_create_uses_vpc_region_size_and_tags(self):
         api = FakeAPI()
