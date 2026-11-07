@@ -19,6 +19,8 @@ package com.cloud.configuration;
 import com.cloud.alert.AlertManager;
 import com.cloud.capacity.dao.CapacityDao;
 import com.cloud.dc.DataCenterVO;
+import com.cloud.dc.DataCenterDetailVO;
+import com.cloud.dc.dao.DataCenterDetailsDao;
 import com.cloud.dc.VlanVO;
 import com.cloud.dc.dao.DataCenterDao;
 import com.cloud.dc.dao.DataCenterIpAddressDao;
@@ -151,6 +153,8 @@ public class ConfigurationManagerImplTest {
     @Mock
     DataCenterDao zoneDao;
     @Mock
+    DataCenterDetailsDao dcDetailsDao;
+    @Mock
     HostDao hostDao;
     @Mock
     HostPodDao podDao;
@@ -219,6 +223,24 @@ public class ConfigurationManagerImplTest {
 
         deleteZoneCmd = Mockito.mock(DeleteZoneCmd.class);
         createNetworkOfferingCmd = Mockito.mock(CreateNetworkOfferingCmd.class);
+    }
+
+    @Test
+    public void providerManagedZoneIsOffByDefault() {
+        ReflectionTestUtils.setField(configurationManagerImplSpy, "_dcDetailsDao", dcDetailsDao);
+        Assert.assertFalse(Boolean.TRUE.equals(ReflectionTestUtils.invokeMethod(
+                configurationManagerImplSpy, "isProviderManagedZone", validId)));
+    }
+
+    @Test
+    public void providerManagedZoneIsEnabledOnlyByItsExplicitDetail() {
+        ReflectionTestUtils.setField(configurationManagerImplSpy, "_dcDetailsDao", dcDetailsDao);
+        DataCenterDetailVO detail = mock(DataCenterDetailVO.class);
+        when(detail.getValue()).thenReturn("true");
+        when(dcDetailsDao.findDetail(validId, ConfigurationManagerImpl.SKYMOON_PROVIDER_MANAGED_ZONE_DETAIL))
+                .thenReturn(detail);
+        Assert.assertTrue(Boolean.TRUE.equals(ReflectionTestUtils.invokeMethod(
+                configurationManagerImplSpy, "isProviderManagedZone", validId)));
     }
 
     @Test
