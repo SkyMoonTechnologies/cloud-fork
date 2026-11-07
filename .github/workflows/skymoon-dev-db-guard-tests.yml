@@ -1,0 +1,22 @@
+name: SkyMoon Development Database Safety Tests
+on:
+  pull_request:
+    paths:
+      - 'management/dev/**'
+      - '.github/workflows/skymoon-dev-db-guard-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'management/dev/**'
+      - '.github/workflows/skymoon-dev-db-guard-tests.yml'
+permissions:
+  contents: read
+jobs:
+  db-guard-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify shell syntax
+        run: bash -n management/dev/db-init-guard.sh management/dev/tests/test-db-init-guard.sh
+      - name: Exercise all non-destructive bootstrap conditions
+        run: bash management/dev/tests/test-db-init-guard.sh
