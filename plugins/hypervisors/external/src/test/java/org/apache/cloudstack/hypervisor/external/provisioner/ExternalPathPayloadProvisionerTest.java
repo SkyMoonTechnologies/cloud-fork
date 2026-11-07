@@ -187,7 +187,7 @@ public class ExternalPathPayloadProvisionerTest {
         when(vm.getId()).thenReturn(42L);
 
         provisioner.persistProviderIdFromExternalCreateResponse(
-                vm, "{\\\"status\\\":\\\"success\\\",\\\"provider_id\\\":123456}");
+                vm, "{\"status\":\"success\",\"provider_id\":123456}");
         Mockito.verify(vmInstanceDetailsDao).addDetail(42L, "skymoon.provider.id", "123456", false);
     }
 
@@ -199,7 +199,7 @@ public class ExternalPathPayloadProvisionerTest {
         when(detail.getValue()).thenReturn("123456");
         when(vmInstanceDetailsDao.findDetail(42L, "skymoon.provider.id")).thenReturn(detail);
 
-        provisioner.persistProviderIdFromExternalCreateResponse(vm, "{\\\"provider_id\\\":\\\"123456\\\"}");
+        provisioner.persistProviderIdFromExternalCreateResponse(vm, "{\"provider_id\":\"123456\"}");
         Mockito.verify(vmInstanceDetailsDao, Mockito.never()).addDetail(
                 Mockito.anyLong(), Mockito.anyString(), Mockito.anyString(), Mockito.anyBoolean());
     }
@@ -212,13 +212,13 @@ public class ExternalPathPayloadProvisionerTest {
         when(detail.getValue()).thenReturn("different-provider-id");
         when(vmInstanceDetailsDao.findDetail(42L, "skymoon.provider.id")).thenReturn(detail);
 
-        provisioner.persistProviderIdFromExternalCreateResponse(vm, "{\\\"provider_id\\\":123456}");
+        provisioner.persistProviderIdFromExternalCreateResponse(vm, "{\"provider_id\":123456}");
     }
 
     @Test
     public void testLegacyProviderResponseDoesNotWriteProviderId() {
         VirtualMachineTO vm = mock(VirtualMachineTO.class);
-        provisioner.persistProviderIdFromExternalCreateResponse(vm, "{\\\"status\\\":\\\"success\\\"}");
+        provisioner.persistProviderIdFromExternalCreateResponse(vm, "{\"status\":\"success\"}");
         Mockito.verifyNoInteractions(vmInstanceDetailsDao);
     }
 
