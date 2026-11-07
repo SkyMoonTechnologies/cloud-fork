@@ -17,6 +17,14 @@ specific language governing permissions and limitations
 under the License.
 -->
 
+# SkyMoon agent and contributor notes
+
+Before modifying this fork, read [SkyMoon's contributor handbook](docs/skymoon/README.md), [architecture map](docs/skymoon/architecture.md), [testing guide](docs/skymoon/testing.md), and [contribution policy](docs/skymoon/contributing.md). These add SkyMoon-specific context to the inherited upstream documentation below.
+
+Treat the provider-managed zone architecture as **proposed**, not implemented. Do not run paid provider operations, reset development databases, or publish secrets to issues or logs. Prefer non-networked tests and preserve normal CloudStack behavior. Follow the repository's existing license and security guidance.
+
+---
+
 # Agent Guide for Apache CloudStack
 
 This file is read by automated agents (security scanners, code
